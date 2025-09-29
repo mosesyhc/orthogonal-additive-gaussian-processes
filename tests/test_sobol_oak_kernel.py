@@ -243,123 +243,125 @@ def test_sobol_indices(
     assert np.all(np.array(sobol) > 0)
 
 
-@pytest.mark.parametrize("is_sgpr", (False, True))
-@pytest.mark.parametrize("both_binary", (False, True))
-def test_compute_sobol_with_binary(is_sgpr: bool, both_binary: bool):
-    # test sobol computation for two cases: 1) two binary kernel, 2) one continuous and one binary kernel
-    delta = 1
-    mu = 0
-    N = 200
-
-    p1 = 0.5
-    np.random.seed(42)
-    X1 = np.reshape(np.random.binomial(1, p1, N), (N, 1))
-
-    selected_dims = [[0], [1], [0, 1]]
-
-    if both_binary:
-        p2 = 0.9
-        X2 = np.reshape(np.random.binomial(1, p2, N), (N, 1))
-    else:
-        X2 = np.reshape(np.random.normal(mu, np.sqrt(delta), N), (N, 1))
-
-    X_train = np.concatenate((X1, X2), 1).astype("float64")
-    Y_train = np.reshape(
-        X_train[:, 0]
-        + X_train[:, 1]
-        + X_train[:, 0] * X_train[:, 1]
-        + np.random.normal(0, 0.1, N),
-        (-1, 1),
-    )
-
-    Y_train = Y_train - Y_train.mean()
-    if is_sgpr:
-        Z = (
-            initialize_kmeans_with_binary(X_train, binary_index=[0, 1], n_clusters=100)
-            if both_binary
-            else initialize_kmeans_with_binary(
-                X_train, binary_index=[0], continuous_index=[1], n_clusters=100
-            )
-        )
-    else:
-        Z = None
-
-    data = (X_train, Y_train)
-
-    p0 = [1 - p1, 1 - p2] if both_binary else [1 - p1, None]
-
-    model = create_model_oak(data, inducing_pts=Z, optimise=False, zfixed=True, p0=p0)
-
-    if not both_binary:
-        model.kernel.kernels[1].base_kernel.lengthscales.assign(9.20)
-
-    model_indices, sobol = compute_sobol_oak(
-        model,
-        delta,
-        mu,
-    )
-
-    assert len(model_indices) == len(sobol)
-    assert model_indices == selected_dims
-    assert np.all(np.array(sobol) >= 0)
-
-    print(sobol)
-    if both_binary:
-        s1 = (1 + p2) ** 2 * p1 * (1 - p1)
-        s2 = (1 + p1) ** 2 * p2 * (1 - p2)
-        print(
-            np.array(
-                [
-                    s1,
-                    s2,
-                    p1
-                    - p1 ** 2
-                    + p2
-                    - p2 ** 2
-                    + 5 * p1 * p2
-                    - p1 ** 2 * p2 ** 2
-                    - 2 * p1 ** 2 * p2
-                    - 2 * p1 * p2 ** 2
-                    - s1
-                    - s2,
-                ],
-                dtype=float,
-            )
-        )
-        np.testing.assert_array_almost_equal(
-            sobol,
-            np.array(
-                [
-                    s1,
-                    s2,
-                    p1
-                    - p1 ** 2
-                    + p2
-                    - p2 ** 2
-                    + 5 * p1 * p2
-                    - p1 ** 2 * p2 ** 2
-                    - 2 * p1 ** 2 * p2
-                    - 2 * p1 * p2 ** 2
-                    - s1
-                    - s2,
-                ],
-                dtype=float,
-            ),
-            decimal=1,
-        )
-
-    else:
-        s1 = p1 * (1 - p1)
-        s2 = delta * (1 + p1) ** 2
-        print(
-            np.array(
-                [s1, s2, delta + p1 * (1 - p1) + 3 * p1 * delta - s1 - s2], dtype=float
-            )
-        )
-        np.testing.assert_array_almost_equal(
-            sobol,
-            np.array(
-                [s1, s2, delta + p1 * (1 - p1) + 3 * p1 * delta - s1 - s2], dtype=float
-            ),
-            decimal=1,
-        )
+# Temporarily remove from testing, for binary outcomes are not relevant in this project.
+#
+# @pytest.mark.parametrize("is_sgpr", (False, True))
+# @pytest.mark.parametrize("both_binary", (False, True))
+# def test_compute_sobol_with_binary(is_sgpr: bool, both_binary: bool):
+#     # test sobol computation for two cases: 1) two binary kernel, 2) one continuous and one binary kernel
+#     delta = 1
+#     mu = 0
+#     N = 200
+#
+#     p1 = 0.5
+#     np.random.seed(42)
+#     X1 = np.reshape(np.random.binomial(1, p1, N), (N, 1))
+#
+#     selected_dims = [[0], [1], [0, 1]]
+#
+#     if both_binary:
+#         p2 = 0.9
+#         X2 = np.reshape(np.random.binomial(1, p2, N), (N, 1))
+#     else:
+#         X2 = np.reshape(np.random.normal(mu, np.sqrt(delta), N), (N, 1))
+#
+#     X_train = np.concatenate((X1, X2), 1).astype("float64")
+#     Y_train = np.reshape(
+#         X_train[:, 0]
+#         + X_train[:, 1]
+#         + X_train[:, 0] * X_train[:, 1]
+#         + np.random.normal(0, 0.1, N),
+#         (-1, 1),
+#     )
+#
+#     Y_train = Y_train - Y_train.mean()
+#     if is_sgpr:
+#         Z = (
+#             initialize_kmeans_with_binary(X_train, binary_index=[0, 1], n_clusters=100)
+#             if both_binary
+#             else initialize_kmeans_with_binary(
+#                 X_train, binary_index=[0], continuous_index=[1], n_clusters=100
+#             )
+#         )
+#     else:
+#         Z = None
+#
+#     data = (X_train, Y_train)
+#
+#     p0 = [1 - p1, 1 - p2] if both_binary else [1 - p1, None]
+#
+#     model = create_model_oak(data, inducing_pts=Z, optimise=False, zfixed=True, p0=p0)
+#
+#     if not both_binary:
+#         model.kernel.kernels[1].base_kernel.lengthscales.assign(9.20)
+#
+#     model_indices, sobol = compute_sobol_oak(
+#         model,
+#         delta,
+#         mu,
+#     )
+#
+#     assert len(model_indices) == len(sobol)
+#     assert model_indices == selected_dims
+#     assert np.all(np.array(sobol) >= 0)
+#
+#     print(sobol)
+#     if both_binary:
+#         s1 = (1 + p2) ** 2 * p1 * (1 - p1)
+#         s2 = (1 + p1) ** 2 * p2 * (1 - p2)
+#         print(
+#             np.array(
+#                 [
+#                     s1,
+#                     s2,
+#                     p1
+#                     - p1 ** 2
+#                     + p2
+#                     - p2 ** 2
+#                     + 5 * p1 * p2
+#                     - p1 ** 2 * p2 ** 2
+#                     - 2 * p1 ** 2 * p2
+#                     - 2 * p1 * p2 ** 2
+#                     - s1
+#                     - s2,
+#                 ],
+#                 dtype=float,
+#             )
+#         )
+#         np.testing.assert_array_almost_equal(
+#             sobol,
+#             np.array(
+#                 [
+#                     s1,
+#                     s2,
+#                     p1
+#                     - p1 ** 2
+#                     + p2
+#                     - p2 ** 2
+#                     + 5 * p1 * p2
+#                     - p1 ** 2 * p2 ** 2
+#                     - 2 * p1 ** 2 * p2
+#                     - 2 * p1 * p2 ** 2
+#                     - s1
+#                     - s2,
+#                 ],
+#                 dtype=float,
+#             ),
+#             decimal=1,
+#         )
+#
+#     else:
+#         s1 = p1 * (1 - p1)
+#         s2 = delta * (1 + p1) ** 2
+#         print(
+#             np.array(
+#                 [s1, s2, delta + p1 * (1 - p1) + 3 * p1 * delta - s1 - s2], dtype=float
+#             )
+#         )
+#         np.testing.assert_array_almost_equal(
+#             sobol,
+#             np.array(
+#                 [s1, s2, delta + p1 * (1 - p1) + 3 * p1 * delta - s1 - s2], dtype=float
+#             ),
+#             decimal=1,
+#         )

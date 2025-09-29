@@ -48,7 +48,8 @@ def test_oak_model(
         optimise=False,
     )
 
-    y_pred = oak.predict(X_test, clip=clip)
+    y_pred, _ = oak.predict(X_test, clip=clip)
+
     rss = mean_squared_error(y_pred, y_test[:, 0])
     # check the model is better than predicting using the mean prediction
     assert rss < mean_squared_error(
