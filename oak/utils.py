@@ -22,6 +22,7 @@ from oak.oak_kernel import (
 from oak.ortho_binary_kernel import OrthogonalBinary
 from oak.ortho_categorical_kernel import OrthogonalCategorical
 from oak.ortho_rbf_kernel import OrthogonalRBFKernel
+from oak.ortho_matern_kernel import OrthogonalMatern32Kernel
 # -
 
 opt = gpflow.optimizers.Scipy()

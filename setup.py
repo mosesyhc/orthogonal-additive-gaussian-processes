@@ -27,9 +27,9 @@ setup(
         "matplotlib",
         "seaborn",
         "IPython",
-        "tensorflow==2.11.1",
+        "tensorflow>=2.11.1",
         "s3fs==0.4.0",
         "scikit-learn-extra==0.2.0",
-        "tensorflow_probability==0.11.0",
+        "tensorflow_probability>=0.11.0",
     ],
 )

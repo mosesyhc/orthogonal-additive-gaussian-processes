@@ -11,11 +11,12 @@ from typing import List, Optional, Tuple, Type
 from oak.input_measures import (
     EmpiricalMeasure,
     GaussianMeasure,
-    MOGMeasure,
+    MOGMeasure, UniformMeasure,
 )
 from oak.ortho_binary_kernel import OrthogonalBinary
 from oak.ortho_categorical_kernel import OrthogonalCategorical
 from oak.ortho_rbf_kernel import OrthogonalRBFKernel
+from oak.ortho_matern_kernel import OrthogonalMatern32Kernel
 from tensorflow_probability import bijectors as tfb
 
 
@@ -70,6 +71,7 @@ class OAKKernel(gpflow.kernels.Kernel):
         empirical_weights: Optional[List[float]] = None,
         gmm_measures: Optional[List[MOGMeasure]] = None,
         share_var_across_orders: Optional[bool] = True,
+        # uniform_measure: bool = False,
     ):
         super().__init__(active_dims=range(num_dims))
         if active_dims is None:
@@ -138,27 +140,43 @@ class OAKKernel(gpflow.kernels.Kernel):
                     )
 
                 if (p0[dim] is None) and (p[dim] is None):
+                    # ----- Continuous inputs -----
+                    # Decide which orthogonal wrapper to use based on the base kernel class
+                    base_kernel_inst = base_kernels[dim]()  # construct a gpflow kernel instance
+
+                    def make_ortho_k(base_kernel, measure_obj):
+                        if isinstance(base_kernel, gpflow.kernels.Matern32):
+                            return OrthogonalMatern32Kernel(
+                                base_kernel, measure=measure_obj, active_dims=active_dims[dim]
+                            )
+                        elif isinstance(base_kernel, gpflow.kernels.SquaredExponential):
+                            return OrthogonalRBFKernel(
+                                base_kernel, measure=measure_obj, active_dims=active_dims[dim]
+                            )
+                        else:
+                            raise NotImplementedError(
+                                f"Unsupported continuous base kernel: {type(base_kernel).__name__} "
+                                "(expected Matern32 or SquaredExponential)."
+                            )
+
                     if empirical_locations[dim] is not None:
-                        k = OrthogonalRBFKernel(
-                            base_kernels[dim](),
+                        k = make_ortho_k(
+                            base_kernel_inst,
                             EmpiricalMeasure(
                                 empirical_locations[dim], empirical_weights[dim]
                             ),
-                            active_dims=active_dims[dim],
                         )
                     elif gmm_measures[dim] is not None:
-                        k = OrthogonalRBFKernel(
-                            base_kernels[dim](),
-                            measure=gmm_measures[dim],
-                            active_dims=active_dims[dim],
-                        )
+                        k = make_ortho_k(base_kernel_inst, gmm_measures[dim])
 
                     else:
+                        measure = GaussianMeasure(0, delta2)
+                        # if uniform_measure:
+                        #     measure = UniformMeasure(-3, 3)
                         # Continuous input with Gaussian measure
-                        k = OrthogonalRBFKernel(
-                            base_kernels[dim](),
-                            GaussianMeasure(0, delta2),
-                            active_dims=active_dims[dim],
+                        k = make_ortho_k(
+                            base_kernel_inst,
+                            measure_obj=measure
                         )
                         if share_var_across_orders:
                             k.base_kernel.variance = tf.ones(

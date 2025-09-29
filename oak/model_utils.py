@@ -5,7 +5,7 @@
 import os
 import time
 from pathlib import Path
-from typing import Callable, List, Optional, Union
+from typing import Callable, List, Optional, Union, Literal
 import gpflow
 import numpy as np
 import tensorflow as tf
@@ -92,6 +92,7 @@ def create_model_oak(
     max_interaction_depth: int = 2,
     constrain_orthogonal: bool = True,
     inducing_pts: np.ndarray = None,
+    use_kernel: Literal["Matern32", "RBF"] = "RBF",
     optimise=False,
     zfixed=True,
     p0=None,
@@ -100,8 +101,10 @@ def create_model_oak(
     empirical_locations: Optional[List[float]] = None,
     empirical_weights: Optional[List[float]] = None,
     use_sparsity_prior: bool = True,
+    # uniform_measure: bool = False,
     gmm_measures: Optional[List[MOGMeasure]] = None,
     share_var_across_orders: Optional[bool] = True,
+    verbose: bool = False
 ) -> GPModel:
     """
     :param num_dims: number of dimensions of inputs
@@ -130,7 +133,12 @@ def create_model_oak(
     base_kernels = [None] * num_dims
     for dim in range(num_dims):
         if (p0[dim] is None) and (p[dim] is None):
-            base_kernels[dim] = gpflow.kernels.RBF
+            if use_kernel == "RBF":
+                base_kernels[dim] = gpflow.kernels.RBF
+            elif use_kernel == "Matern32":
+                base_kernels[dim] = gpflow.kernels.Matern32
+            else:
+                raise NotImplementedError(f"Unknown kernel type: {use_kernel}")
 
     k = OAKKernel(
         base_kernels,
@@ -142,6 +150,7 @@ def create_model_oak(
         lengthscale_bounds=lengthscale_bounds,
         empirical_locations=empirical_locations,
         empirical_weights=empirical_weights,
+        # uniform_measure=uniform_measure,
         gmm_measures=gmm_measures,
         share_var_across_orders=share_var_across_orders,
     )
@@ -159,7 +168,8 @@ def create_model_oak(
         model = GPR(data, mean_function=None, kernel=k)
     # set priors for variance
     if use_sparsity_prior:
-        print("Using sparsity prior")
+        if verbose:
+            print("Using sparsity prior")
         if share_var_across_orders:
             for p in model.kernel.variances:
                 p.prior = tfd.Gamma(f64(1.0), f64(0.2))
@@ -171,8 +181,9 @@ def create_model_oak(
         opt.minimize(
             model.training_loss_closure(), model.trainable_variables, method="BFGS"
         )
-        gpflow.utilities.print_summary(model, fmt="notebook")
-        print(f"Training took {time.time() - t_start:.1f} seconds.")
+        gpflow.utilities.print_summary(model)  #, fmt="notebook")
+        if verbose:
+            print(f"Training took {time.time() - t_start:.1f} seconds.")
     return model
 
 
@@ -199,12 +210,14 @@ class oak_model:
         lengthscale_bounds=[1e-3, 1e3],
         binary_feature: Optional[List[int]] = None,
         categorical_feature: Optional[List[int]] = None,
+        use_kernel: Literal["RBF", "Matern32"] = "RBF",
         empirical_measure: Optional[List[int]] = None,
         use_sparsity_prior: bool = True,
         gmm_measure: Optional[List[int]] = None,
         sparse: bool = False,
         use_normalising_flow: bool = True,
         share_var_across_orders: bool = True,
+        verbose: bool = False
     ):
         """
         :param max_interaction_depth: maximum number of interaction terms to consider
@@ -227,6 +240,7 @@ class oak_model:
         self.binary_feature = binary_feature
         self.categorical_feature = categorical_feature
         self.use_sparsity_prior = use_sparsity_prior
+        self.use_kernel = use_kernel
 
         # state filled in during fit call
         self.input_flows = None
@@ -245,6 +259,7 @@ class oak_model:
         self.sparse = sparse
         self.use_normalising_flow = use_normalising_flow
         self.share_var_across_orders = share_var_across_orders
+        self.verbose = verbose
 
     def fit(
         self,
@@ -271,6 +286,7 @@ class oak_model:
             X,
             categorical_feature=self.categorical_feature,
             binary_feature=self.binary_feature,
+            verbose=self.verbose
         )
         # discrete_input_set = set(self.binary_index).union(set(self.categorical_index))
         if self.empirical_measure is not None:
@@ -401,15 +417,18 @@ class oak_model:
             p=p,
             lengthscale_bounds=self.lengthscale_bounds,
             use_sparsity_prior=self.use_sparsity_prior,
+            use_kernel=self.use_kernel,
             empirical_locations=self.empirical_locations,
             empirical_weights=self.empirical_weights,
             gmm_measures=self.estimated_gmm_measures,
             share_var_across_orders=self.share_var_across_orders,
+            verbose=self.verbose
         )
 
     def optimise(
         self,
         compile: bool = True,
+        verbose: bool = True,
     ):
 
         print("Model prior to optimisation")
@@ -423,7 +442,8 @@ class oak_model:
             method="BFGS",
             compile=compile,
         )
-        gpflow.utilities.print_summary(self.m, fmt="notebook")
+        if verbose:
+            gpflow.utilities.print_summary(self.m, fmt="notebook")
         print(f"Training took {time.time() - t_start:.1f} seconds.")
 
     def predict(self, X: tf.Tensor, clip=False) -> tf.Tensor:
@@ -437,8 +457,16 @@ class oak_model:
         else:
             X_scaled = self._transform_x(X)
         try:
-            y_pred = self.m.predict_f(X_scaled)[0].numpy()
-            return self.scaler_y.inverse_transform(y_pred)[:, 0]
+            y_pred, y_var = self.m.predict_f(X_scaled)
+            y_pred_np = y_pred.numpy()
+            y_var_np = y_var.numpy()
+
+            # rescaling
+            y_pred_np = self.scaler_y.inverse_transform(y_pred)
+            y_var_np = self.scaler_y.var_ * y_var_np
+
+            return y_pred_np[:, 0], y_var_np[:, 0]
+
         except ValueError:
             print("test X is outside the range of training input, try clipping X.")
 
@@ -492,6 +520,9 @@ class oak_model:
             transformer_x = lambda x: x * std_i + mean_i
         elif self.gmm_measure is not None and i in self.gmm_measure:
             transformer_x = None
+        # elif self.uniform_measure:
+        #     scaler_x = self.scaler_X_continuous
+        #     transformer_x = lambda x: x * np.sqrt(scaler_x.var_[i]) + scaler_x.mean_[i]
         else:
             transformer_x = self.input_flows[i].bijector.inverse
         return transformer_x
@@ -701,7 +732,7 @@ class oak_model:
 
 
 def _calculate_features(
-    X: tf.Tensor, categorical_feature: List[int], binary_feature: List[int]
+    X: tf.Tensor, categorical_feature: List[int], binary_feature: List[int], verbose=True
 ):
     """
     Calculate features index set
@@ -743,9 +774,11 @@ def _calculate_features(
                 p.append(None)
                 p0.append(None)
                 continuous_index.append(j)
-    print("indices of binary feature ", binary_index)
-    print("indices of continuous feature ", continuous_index)
-    print("indices of categorical feature ", categorical_index)
+
+    if verbose:
+        print("indices of binary feature ", binary_index)
+        print("indices of continuous feature ", continuous_index)
+        print("indices of categorical feature ", categorical_index)
 
     return continuous_index, binary_index, categorical_index, p0, p
 

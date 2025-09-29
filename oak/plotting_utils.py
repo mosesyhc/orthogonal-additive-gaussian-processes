@@ -151,7 +151,7 @@ def plot_single_effect(
             Y_corrected_rescaled = y_transform(Y_corrected)
 
     # do the actual plotting
-    figure = plt.figure(figsize=(8, 4))
+    figure = plt.Figure(figsize=(8, 4))
     ax1 = figure.add_axes([0.2, 0.2, 0.75, 0.75])
     ax1.plot(xx_rescaled, mu_rescaled, linewidth=1, color="k", zorder=11)
     ax1.plot(xx_rescaled, lower_rescaled, linewidth=0.5, color="k", zorder=11)
