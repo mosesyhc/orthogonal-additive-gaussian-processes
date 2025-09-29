@@ -9,7 +9,7 @@ seaborn
 jupyter
 tqdm
 numpy
-matplotlib
+matplotlib<=3.7
 IPython
 scikit-learn
 tikzplotlib
