@@ -8,7 +8,7 @@ from setuptools import find_packages, setup
 setup(
     name="oak",
     version="0.0.1",
-    packages=find_packages(include=['oak/oak', 'oak.*']),
+    packages=find_packages(include=['oak', 'oak.*']),
     install_requires=[
         "gpflow>=2.2.1",
         "pytest>=5.4.1",
