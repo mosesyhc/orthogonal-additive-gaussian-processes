@@ -9,7 +9,7 @@ import gpflow
 import matplotlib
 import numpy as np
 import tensorflow as tf
-import tikzplotlib
+# import tikzplotlib
 from matplotlib import pyplot as plt
 from oak.utils import get_model_sufficient_statistics
 
@@ -45,7 +45,7 @@ def plot_single_effect(
     plot_raw_data=False,
     X_list=None,
     fontsize=22,
-    tikz_path=None,
+    # tikz_path=None,
     ylim=None,
     quantile_range: Optional[List] = None,
     log_bin=False,
@@ -210,8 +210,8 @@ def plot_single_effect(
     if semilogy:
         ax1.semilogy()
     fig_list = FigureDescription(fig=figure, description=title)
-    if tikz_path is not None:
-        tikzplotlib.save(tikz_path + f"{title}.tex")
+    # if tikz_path is not None:
+    #     tikzplotlib.save(tikz_path + f"{title}.tex")
     return fig_list
 
 
@@ -370,8 +370,8 @@ def plot_second_order(
         tick.set_visible(False)
 
     fig_list = FigureDescription(fig=figure, description=title)
-    if tikz_path is not None:
-        tikzplotlib.save(tikz_path + f"{title}.tex")
+    # if tikz_path is not None:
+    #     tikzplotlib.save(tikz_path + f"{title}.tex")
     return fig_list
 
 
@@ -448,8 +448,8 @@ def plot_single_effect_binary(
         ax1a.semilogy()
 
     fig_list = FigureDescription(fig=fig, description=title)
-    if tikz_path is not None:
-        tikzplotlib.save(tikz_path + f"{title}.tex")
+    # if tikz_path is not None:
+    #     tikzplotlib.save(tikz_path + f"{title}.tex")
     return fig_list
 
 
@@ -594,8 +594,8 @@ def plot_second_order_binary(
     ax.set_title(title)
 
     fig_list = FigureDescription(fig=fig, description=title)
-    if tikz_path is not None:
-        tikzplotlib.save(tikz_path + f"{title}.tex")
+    # if tikz_path is not None:
+    #     tikzplotlib.save(tikz_path + f"{title}.tex")
     return fig_list
 
 
@@ -661,6 +661,6 @@ def plot_single_effect_categorical(
         ax1.semilogy()
 
     fig_list = FigureDescription(fig=fig, description=title)
-    if tikz_path is not None:
-        tikzplotlib.save(tikz_path + f"{title}.tex")
+    # if tikz_path is not None:
+    #     tikzplotlib.save(tikz_path + f"{title}.tex")
     return fig_list
