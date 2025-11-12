@@ -23,6 +23,6 @@ setup(
         "tensorflow==2.18.0",
         "s3fs>=0.4.0",
         "scikit-learn-extra>=0.2.0",
-        "tensorflow_probability==0.25.0",
+        "tensorflow_probability[tf]==0.25.0",
     ],
 )
